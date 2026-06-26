@@ -1,0 +1,348 @@
+// CFORM system Copyright Jolyon Ralph 2000-2024
+
+var gTabPos = [];
+
+const safeLoadHandlers = [];
+const safeUnloadHandlers = [];
+
+function executeHandlers(handlers) {
+	handlers.forEach(handler => handler());
+}
+
+window.addEventListener('load', () => executeHandlers(safeLoadHandlers));
+window.addEventListener('unload', () => executeHandlers(safeUnloadHandlers));
+
+function SafeAddOnload(f) {
+	if (!safeLoadHandlers.includes(f)) {
+		safeLoadHandlers.push(f);
+	}
+}
+
+function SafeAddOnunload(f) {
+	if (!safeUnloadHandlers.includes(f)) {
+		safeUnloadHandlers.push(f);
+	}
+}
+
+function cformremselected(dest)
+{
+	for(var i=0;i<dest.options.length;i++)
+	{
+		var o = dest.options[i];
+		if(o.selected)
+		{
+			dest.options[i]=null;
+		}
+	}
+}
+
+function estimatePasswordEntropy(password) {
+	const length = password.length;
+	let charsets = 0;
+
+	if (/[a-z]/.test(password)) charsets += 26;
+	if (/[A-Z]/.test(password)) charsets += 26;
+	if (/[0-9]/.test(password)) charsets += 10;
+	if (/[^a-zA-Z0-9]/.test(password)) charsets += 32; // estimated symbols
+
+	if (charsets === 0) return 0;
+
+	const entropy = Math.log2(charsets) * length;
+	return entropy;
+}
+function cformaddselected(from,dest,maxcount)
+{
+	var options = new Object();
+
+	if(maxcount>0)
+	{
+		if(dest.options.length>=maxcount) return;
+	}
+
+
+	for(var i=0;i<dest.options.length;i++)
+	{
+		options[dest.options[i].value] = dest.options[i].text;
+	}
+	for(var i=0;i<from.options.length;i++)
+	{
+		var o = from.options[i];
+		if(o.selected)
+		{
+			if(options[o.value] == null || options[o.value] == "undefined" || options[o.value]!=o.text)
+			{
+				dest.options[dest.options.length] = new Option( o.text, o.value, false, false);
+			}
+		}
+	}
+
+	sortSelect(to);
+
+	from.selectedIndex = -1;
+	dest.selectedIndex = -1;
+}
+
+
+function cformgetchecks(formId, pattern) {
+	const regex = new RegExp(pattern);
+	const checkboxes = Array.from(document.forms[formId].elements).filter(
+		element => element.type === 'checkbox' && regex.test(element.name) && element.checked
+	);
+	return checkboxes.map(checkbox => checkbox.value).join(",");
+}
+
+
+function cformgetcheck(formId, elementIdx) {
+	return document.forms[formId].elements[elementIdx].checked ? 1 : 0;
+}
+
+
+function cformcheckAll(formid,val,pattern)
+{
+	for(var elementIdx=0; elementIdx < formid.elements.length; elementIdx++)
+	{
+		if(formid.elements[elementIdx].type == 'checkbox')
+		{
+			if(pattern!="")
+			{
+				var pat = new RegExp(pattern);
+
+				if(pat.test(formid.elements[elementIdx].name)==true)
+				{
+					formid.elements[elementIdx].checked = val;
+		}
+			} else
+			{
+				formid.elements[elementIdx].checked = val;
+			}
+}
+	}
+}
+function cformvalidate(formid,itemid,valtype,vmin,vmax)
+{
+ var v=1;
+ var itemval = itemid.value;
+
+
+
+ if(valtype.charAt(0)=="@")
+ {
+
+ 	if(itemval=="") return(true);
+ 	valtype = valtype.substring(1,valtype.length);
+
+ }
+ switch(valtype)
+ {
+ case "CUSTOMJS":
+ 	v=0;
+ 	var exe = vmin+"(document.forms[\""+formid+"\"]);";
+ 	if(eval(exe)) v=1;
+
+ 	break;
+ case "SET":
+ 	if(itemval=="") v=0;
+ 	break;
+ case "NEEDBOTH":
+ 	v=0;
+ 	if(itemval)
+ 	{
+ 		var val2 = document.forms[formid].elements[vmin].value;
+ 		if(val2) v=1;
+ 	}
+ 	break;
+ case "EMAIL":
+ 	var regex = /^[a-zA-Z0-9._-]+@([a-zA-Z0-9.-]+\.)+[a-zA-Z0-9.-]{2,32}$/;
+ 	v = regex.test(itemval);
+ 	break;
+ case "TEL":
+ case "PHONE":
+ 	var regex = /^\+?[\(\) 0-9-]+$/;
+ 	v = regex.test(itemval);
+ 	break;
+ case "NEEDEITHER":
+	 v=0;
+	 if(!itemval)
+	 {
+	 	var item2val = document.forms[formid].elements[vmin].value;  if(item2val) v=1;
+	 	if(vmax)
+	 	{
+	 		var item2val = document.forms[formid].elements[vmax].value;  if(item2val) v=1;
+	 	}
+
+ 	} else v=1;
+
+ 	break;
+
+	 case "INT":
+		 v=0;
+		 if(!isNaN(itemval)&&(itemval!=''))
+		 {
+		 	vmin = parseInt(vmin);
+		 	vmax = parseInt(vmax);
+		 	if(itemval>=vmin && itemval<=vmax) v=1;
+		 }
+		 break;
+	 case "NOTEQ":
+	 case "NOTEQUAL":
+	 	if(itemval==vmin) v=0;
+	 	break;
+	 case "SELECT":
+	 	if(parseInt(itemval)==0) v=0;
+	 	break;
+	 case "CLEANTEXT":
+	 case "ALPHA":
+	 case "ALPHANUMERIC":
+	 case "PLAINTEXT":
+	 case "TEXT":
+	 	v=0;
+	 	if(itemval)
+	 	{
+ 			var strl = itemval.length;
+ 			vmin = parseInt(vmin);
+ 			vmax = parseInt(vmax);
+ 			if((strl>=vmin) && (strl<=vmax)) v=1;
+ 		}
+ 		break;
+ 	case "VAREQ":
+ 		v = 0;
+ 		var val2 = document.forms[formid].elements[vmin].value;
+ 		if(val2 == itemval) v = 1;  break;
+    case "ENTROPY":
+        v = 0;
+        if (itemval) {
+            const entropy = estimatePasswordEntropy(itemval);
+            if (entropy >= parseFloat(vmin)) v = 1;
+        }
+        break;
+ 	}
+ 	return(v);
+ }
+
+function cfGetElement(formId, elementName) {
+	return document.forms[formId].elements[elementName];
+}
+
+
+/*
+function tabClick(currentItem, currentTabId, formId, activeClass, inactiveClass) {
+	console.log("Tab click "+currentTabId);
+	const currentContentId = `cform_${formId}_tabarea_${currentTabId}`;
+	const currentContent = document.getElementById(currentContentId);
+	const currentTabIdStorage = `tabPos_${formId}`;
+
+	if (!currentItem) {
+		currentItem = document.getElementById(`cform_${formId}_tab_${currentTabId}`);
+	}
+
+	let previousTabId = sessionStorage.getItem(currentTabIdStorage) || 0;
+
+	if (previousTabId === currentTabId) return;
+
+	const previousTab = document.getElementById(`cform_${formId}_tab_${previousTabId}`);
+	const previousContent = document.getElementById(`cform_${formId}_tabarea_${previousTabId}`);
+
+	if (previousTab && previousContent) {
+		previousTab.className = inactiveClass;
+		previousContent.style.display = 'none';
+	}
+
+	currentItem.className = activeClass;
+	currentContent.style.display = '';
+
+	sessionStorage.setItem(currentTabIdStorage, currentTabId);
+}
+*/
+
+function x(locid,mapid)
+{
+
+	var nlocid = locid;
+	if(nlocid<0) nlocid=0-nlocid;
+
+	var ctrlid='#li'+nlocid;
+
+	$(ctrlid).html("loading...");
+
+	$.get("mapfragment.php?c=0",{id: locid, m: mapid}, function(data)
+	{
+
+			$(ctrlid).hide();
+			$(ctrlid).html(data);
+			$(ctrlid).slideToggle('fast');
+	},"html");
+
+
+	return(0);
+}
+
+function y(locid)
+{
+	var nlocid = locid;
+	if(nlocid<0) nlocid=0-nlocid;
+	var ctrlid='#li'+nlocid;
+
+
+	$.get("mapfragment.php?c=1",{id: locid}, function(data)
+	{
+		$(ctrlid).slideToggle('fast');
+		$(ctrlid).html(data);
+		$(ctrlid).slideToggle('fast');
+
+	},"html");
+	return(0);
+}
+
+function y2(locid)
+{
+	var nlocid = locid;
+	if(nlocid<0) nlocid=0-nlocid;
+	var ctrlid='#li'+nlocid;
+
+
+	$.get("mapfragment.php?c=1&f=2018",{id: locid}, function(data)
+	{
+		$(ctrlid).slideToggle('fast');
+		$(ctrlid).html(data);
+		$(ctrlid).slideToggle('fast');
+
+	},"html");
+	return(0);
+}
+
+
+function tabClick(thisitem,thisid,formid,class2,class1)
+{
+	var thisDiv = document.getElementById("cform_"+formid+"_tabarea_"+thisid);
+
+	console.log(thisid+" - "+gTabPos[formid]);
+
+	if(thisitem == null)
+	{
+		thisitem = document.getElementById("cform_"+formid+"_tab_"+thisid);
+	}
+
+
+	var tabPos = gTabPos[formid];
+	if(typeof(tabPos)=='undefined') tabPos=0;
+
+	if(tabPos==thisid) return;
+
+
+	var lastTab = document.getElementById("cform_"+formid+"_tab_"+tabPos);
+	var lastDiv = document.getElementById("cform_"+formid+"_tabarea_"+tabPos);
+
+
+
+	thisitem.className=class2;
+
+	lastTab.className=class1;
+
+	lastDiv.style.display="none";
+	thisDiv.style.display="";
+	gTabPos[formid]=thisid;
+
+
+
+}
+
