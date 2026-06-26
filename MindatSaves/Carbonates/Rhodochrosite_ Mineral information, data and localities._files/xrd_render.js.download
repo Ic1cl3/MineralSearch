@@ -1,0 +1,75 @@
+document.addEventListener('DOMContentLoaded', function () {
+    const dropdown = document.getElementById("xrdfile");
+    if (!dropdown) return;
+
+    dropdown.addEventListener("change", loadXRD);
+    loadXRD(); // load default
+});
+
+async function loadXRD() {
+    const id = document.getElementById("xrdfile").value;
+    const msg = document.getElementById("waitxrd");
+    const plot = document.getElementById("xrdplot");
+    const xAxisMode = document.querySelector('input[name="xaxis"]:checked').value;
+
+    msg.style.display = "block";
+
+    try {
+        const response = await fetch("xrddata.php?id=" + id);
+        const json = await response.json();
+
+        if (!json.data || !Array.isArray(json.data)) {
+            plot.innerHTML = "No valid data found.";
+            console.error("Invalid JSON structure:", json);
+            msg.style.display = "none";
+            return;
+        }
+
+        const lambda = 1.5406; // Cu Kα in Å
+        let xVals, xLabel;
+
+        if (xAxisMode === 'd') {
+            // Convert to d-spacing
+            xVals = json.data.map(p => {
+                const theta = (p.angle / 2.0) * Math.PI / 180;
+                const d = lambda / (2 * Math.sin(theta));
+                return parseFloat(d.toFixed(3)); // limit decimal noise
+            });
+            xLabel = "d-spacing (Å)";
+        } else {
+            xVals = json.data.map(p => p.angle);
+            xLabel = "2θ (degrees)";
+        }
+
+        const data = [{
+            x: xVals,
+            y: json.data.map(p => p.intensity),
+            type: 'scatter',
+            mode: 'lines',
+            line: { width: 2 },
+            name: json.title || 'XRD Pattern'
+        }];
+
+        const xMin = Math.min(...xVals);
+        const xMax = Math.max(...xVals);
+
+        const layout = {
+            title: 'XRD Pattern (Radiation: ' + json.radiation + ')',
+            xaxis: {
+                title: xLabel,
+                range: [xMin, xMax]
+            },
+            yaxis: {
+                title: 'Intensity (%)'
+            },
+            margin: { t: 40 }
+        };
+
+        Plotly.newPlot('xrdplot', data, layout, { responsive: true });
+    } catch (err) {
+        plot.innerHTML = "Failed to load data.";
+        console.error("Error loading XRD data:", err);
+    }
+
+    msg.style.display = "none";
+}
