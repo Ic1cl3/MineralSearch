@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mindat Mineral Browser</title>
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+}
+
+#sidebar {
+    width: 260px;
+    overflow-y: auto;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+    box-sizing: border-box;
+    background: #f8f8f8;
+}
+
+#sidebar h2 {
+    margin-top: 0;
+    font-size: 20px;
+}
+
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#sidebar li {
+    margin: 2px 0;
+}
+
+#sidebar a {
+    text-decoration: none;
+    color: #004080;
+    display: block;
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+
+#sidebar a:hover {
+    background: #ddeeff;
+}
+
+iframe {
+    flex: 1;
+    border: none;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+<h2>Minerals</h2>
+<ul>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Ulexite">Ulexite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Aragonite">Aragonite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Azurite">Azurite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Calcite">Calcite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Dolomite">Dolomite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Malachite">Malachite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Magnesite">Magnesite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Rhodochrosite">Rhodochrosite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Siderite">Siderite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Copper">Copper</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Diamond">Diamond</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Gold">Gold</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Graphite">Graphite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Silver">Silver</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Sulfur">Sulfur</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Fluorite">Fluorite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Halite">Halite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Corundum">Corundum</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Goethite">Goethite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Hematite">Hematite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Magnetite">Magnetite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Pyrolusite">Pyrolusite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Rutile">Rutile</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Zincite">Zincite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Turquoise">Turquoise</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Fluorapatite">Fluorapatite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Pyromorphite">Pyromorphite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Vanadinite">Vanadinite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Barite">Barite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Celestite">Celestite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Alabaster">Alabaster</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Satin Spar">Satin Spar</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Selenite">Selenite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Bornite">Bornite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Chalcopyrite">Chalcopyrite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Galena">Galena</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Pyrite">Pyrite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Sphalerite">Sphalerite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Stibnite">Stibnite</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Actinolite">Actinolite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Hornblende">Hornblende</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Tremolite">Tremolite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Apophyllite">Apophyllite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Beryl">Beryl</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Chrysocolla">Chrysocolla</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Dioptase">Dioptase</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Epidote">Epidote</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Plagioclase">Plagioclase</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Albite">Albite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Labradorite">Labradorite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Amazonite">Amazonite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Orthoclase">Orthoclase</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Almandine">Almandine</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Grossular">Grossular</a></li>
+
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Kaolinite">Kaolinite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Kyanite">Kyanite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Biotite">Biotite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Lepidolite">Lepidolite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Muscovite">Muscovite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Olivine">Olivine</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Prehnite">Prehnite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Augite">Augite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Rhodonite">Rhodonite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Spodumene">Spodumene</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Aventurine">Aventurine</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Agate">Agate</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Amethyst">Amethyst</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Citrine">Citrine</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Jasper">Jasper</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Milky Quartz">Milky Quartz</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Opal">Opal</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Rock Crystal">Rock Crystal</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Rose Quartz">Rose Quartz</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Smoky Quartz">Smoky Quartz</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Tiger Eye">Tiger Eye</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Sodalite">Sodalite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Staurolite">Staurolite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Stilbite">Stilbite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Talc">Talc</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Topaz">Topaz</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Tourmaline">Tourmaline</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Willemite">Willemite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Wollastonite">Wollastonite</a></li>
+<li><a target="mindat" href="https://www.mindat.org/search.php?search=Zircon">Zircon</a></li>
+
+</ul>
+</div>
+
+<iframe
+    name="mindat"
+    src="https://www.mindat.org/"
+    title="Mindat Browser">
+</iframe>
+
+</body>
+</html>
