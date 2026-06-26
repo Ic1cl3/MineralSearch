@@ -1,0 +1,357 @@
+// /js/biref_visual.js
+import { levyLUT } from './levy_lut_final.js';
+const USE_VORONOI_MODEL = true;
+const barCanvas = document.getElementById('colorBar');
+const simCanvas = document.getElementById('rotSim');
+const angleSlider = document.getElementById('angleSlider');
+const thicknessSlider = document.getElementById('thicknessSlider');
+const playButton = document.getElementById('playButton');
+const birefInput = document.getElementById('birefvalue');
+const thicknessDisplay = document.getElementById('thicknessValue');
+
+let angleDeg = parseFloat(angleSlider?.value || "0");
+let thickness = parseFloat(thicknessSlider?.value || "30"); // µm
+const deltaN = parseFloat(birefInput?.value );
+let autoRotate = false;
+
+const maxRetardation = 900; // nm
+
+const r1 = 60; // Inner ring radius (adjust as needed)
+const r2 = 90; // Outer ring radius
+
+if(!USE_VORONOI_MODEL)
+{
+
+    const grainConfigs = [];
+let mainGrainShape = generateGrainShape(); // Unique shape for main grain
+// 10 inner grains
+
+
+
+for (let i = 0; i < 10; i++) {
+    grainConfigs.push({
+        positionAngle: (i * 360) / 10,
+        extinctionAngle: Math.random() * 90,
+        scale: 0.4 + Math.random() * 0.6,
+        shape: generateGrainShape(),
+        ringRadius: r1
+    });
+}
+
+// 16 outer grains
+for (let i = 0; i < 16; i++) {
+    grainConfigs.push({
+        positionAngle: (i * 360) / 16 + 11.25, // half-step offset for variety
+        extinctionAngle: Math.random() * 90,
+        scale: 0.4 + Math.random() * 0.6,
+        shape: generateGrainShape(),
+        ringRadius: r2
+    });
+}
+}
+function hexToRgb(hex) {
+    const bigint = parseInt(hex.slice(1), 16);
+    return [ (bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255 ];
+}
+
+function rgbToHex([r, g, b]) {
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function interpolateColor(c1, c2, frac) {
+    const rgb1 = hexToRgb(c1);
+    const rgb2 = hexToRgb(c2);
+    const rgb = rgb1.map((v, i) => Math.round(v + (rgb2[i] - v) * frac));
+    return rgbToHex(rgb);
+}
+
+
+
+
+function drawColourBar() {
+    const ctx = barCanvas.getContext('2d');
+    const w   = barCanvas.width;
+    const h   = barCanvas.height;
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+
+    // const maxDeltaN = 0.030;
+    const maxDeltaN = 0.030 / (thickness / 30);
+
+    const imgWidth  = 2000;
+    const lutLength = levyLUT.colors.length;
+    const rate      = deltaN;
+
+    const amount    = (178 * rate / maxDeltaN) * (lutLength / imgWidth);
+    const lutCutoff = Math.min(lutLength - 1, amount);
+
+    for (let x = 0; x < w; x++) {
+        const lutX = (x / w) * lutCutoff;
+        const i    = Math.floor(lutX);
+        const frac = lutX - i;
+        const c1 = levyLUT.colors[i];
+        const c2 = levyLUT.colors[i + 1] || c1;
+        ctx.fillStyle = interpolateColor(c1, c2, frac);
+        ctx.fillRect(x, 0, 1, h);
+    }
+}
+
+function generateGrainShape(radius = 20, points = 40) {
+    const shape = [];
+    const randomJitter = [];
+
+    for (let i = 0; i < points; i++) {
+        const angle = (i / points) * 2 * Math.PI;
+        const jitter = 0.7 + Math.random() * 0.6;
+        randomJitter.push(jitter);  // Store for reuse
+        const x = Math.cos(angle) * radius * jitter;
+        const y = Math.sin(angle) * radius * jitter;
+        shape.push({ x, y });
+    }
+
+    return shape;
+}
+const VORONOI_GRAIN_COUNT = 6;
+const VORONOI_RINGS = 20;
+
+
+   // console.log("deltaN:", deltaN);
+    const voronoiGrains = generateVoronoiGrains(VORONOI_GRAIN_COUNT, VORONOI_RINGS);
+   // console.log("Grains:", voronoiGrains);
+   // console.log("Canvas size:", simCanvas.width, simCanvas.height);
+   // console.log("Grain count:", voronoiGrains.length);
+
+
+function generateVoronoiGrains(numRings = 6, maxGrainsPerRing = 80) {
+    const grains = [];
+    const ctx = simCanvas.getContext('2d');
+    const width = simCanvas.width;
+    const height = simCanvas.height;
+    const cx = width / 2;
+    const cy = height / 2;
+    const radiusMax = Math.min(cx, cy);
+    const radiusStep = radiusMax / numRings;
+
+    grains.push({ x: cx, y: cy, offset: 0, angle: Math.random() * 360, span: 1.0, size: 1.0 });
+
+    for (let r = 1; r <= numRings + 2; r++) {
+        const radius = r * radiusStep * 1.05;
+        const ringPoints = Math.round((radius / radiusMax) * maxGrainsPerRing * (0.7 + 0.6 * Math.random()));
+
+        for (let i = 0; i < ringPoints; i++) {
+            const spacingJitter = (Math.random() - 0.5) * (Math.PI / ringPoints);
+            const theta = (i / ringPoints) * 2 * Math.PI + spacingJitter;
+            const jitter = radiusStep * 0.6 * (Math.random() - 0.5);
+            const x = cx + Math.cos(theta) * (radius + jitter);
+            const y = cy + Math.sin(theta) * (radius + jitter);
+
+            grains.push({
+                x,
+                y,
+                offset: 360 * Math.random(),
+                angle: 360 * Math.random(),
+                span: 0.2 + 0.8 * Math.random(),
+                size: 0.3 + 1.7 * Math.random()
+            });
+        }
+    }
+
+    return grains;
+}
+
+
+function seededRandom(seed) {
+    const x = Math.sin(seed * 9999.1 + 123.456) * 43758.5453;
+    return x - Math.floor(x); // Keep it in [0, 1)
+}
+
+
+function drawRotSim() {
+    if (USE_VORONOI_MODEL) {
+        drawVoronoiSim();
+    } else {
+        drawRandomGrainSim();
+    }
+}
+function drawVoronoiSim() {
+    const ctx = simCanvas.getContext('2d');
+    const width = simCanvas.width;
+    const height = simCanvas.height;
+    const cx = width / 2;
+    const cy = height / 2;
+    const radius = Math.min(width, height) / 2 - 5;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'black';
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+
+    const angleRad = angleDeg * Math.PI / 180;
+    const rotatedPoints = voronoiGrains.map(g => {
+        const dx = g.x - cx;
+        const dy = g.y - cy;
+        const rx = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+        const ry = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+        return [cx + rx, cy + ry];
+    });
+
+    const delaunay = d3.Delaunay.from(rotatedPoints);
+    const voronoi = delaunay.voronoi([0, 0, width, height]);
+
+    const barCtx = barCanvas.getContext('2d');
+    const barData = barCtx.getImageData(0, 0, barCanvas.width, 1).data;
+
+    for (let i = 0; i < rotatedPoints.length; i++) {
+        const cell = voronoi.cellPolygon(i);
+        if (!cell) continue;
+
+        const grain = voronoiGrains[i];
+        const offsetAngle = (angleDeg + grain.offset) % 360;
+        const norm = Math.abs(Math.sin(2 * offsetAngle * Math.PI / 180));
+        const span = grain.span || 1.0;
+        const px = Math.floor(norm * span * (barCanvas.width - 1));
+        const j = px * 4;
+        const rCol = barData[j];
+        const gCol = barData[j + 1];
+        const bCol = barData[j + 2];
+        const color = `rgb(${rCol}, ${gCol}, ${bCol})`;
+
+        ctx.beginPath();
+        ctx.moveTo(cell[0][0], cell[0][1]);
+        for (let j = 1; j < cell.length; j++) {
+            ctx.lineTo(cell[j][0], cell[j][1]);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+
+function drawRandomGrainSim() {
+    const ctx = simCanvas.getContext('2d');
+    const size = Math.min(simCanvas.width, simCanvas.height);
+    const mainSize = size / 3;
+    const r = size / 2 - 5;
+    const cx = simCanvas.width / 2;
+    const cy = simCanvas.height / 2;
+
+    ctx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+
+    // Draw circular black background
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.fillStyle = 'black';
+    ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const barCtx = barCanvas.getContext('2d');
+    const barData = barCtx.getImageData(0, 0, barCanvas.width, 1).data;
+
+    // Draw all peripheral grains
+    grainConfigs.forEach((grain) => {
+        const extinctionAngle = angleDeg + grain.extinctionAngle;
+        const norm = Math.abs(Math.sin(2 * extinctionAngle * Math.PI / 180)) * grain.scale;
+        const px = Math.floor(norm * (barCanvas.width - 1));
+        const i = px * 4;
+        const rCol = barData[i];
+        const gCol = barData[i + 1];
+        const bCol = barData[i + 2];
+        const color = `rgb(${rCol}, ${gCol}, ${bCol})`;
+
+        const angleRad = (angleDeg + grain.positionAngle) * Math.PI / 180;
+        const gx = cx + Math.cos(angleRad) * grain.ringRadius;
+        const gy = cy + Math.sin(angleRad) * grain.ringRadius;
+
+        const scaleFactor = grain.size / 25;
+
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.rotate((angleDeg + grain.extinctionAngle) * Math.PI / 180);
+        ctx.scale(scaleFactor, scaleFactor);
+        ctx.beginPath();
+        ctx.moveTo(grain.shape[0].x, grain.shape[0].y);
+        for (let j = 1; j < grain.shape.length; j++) {
+            ctx.lineTo(grain.shape[j].x, grain.shape[j].y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = 'black';
+        ctx.stroke();
+
+        ctx.restore();
+    });
+
+    // Draw main central grain
+    const norm = Math.abs(Math.sin(2 * angleDeg * Math.PI / 180));
+    const px = Math.floor(norm * (barCanvas.width - 1));
+    const i = px * 4;
+    const rCol = barData[i];
+    const gCol = barData[i + 1];
+    const bCol = barData[i + 2];
+    const color = `rgb(${rCol}, ${gCol}, ${bCol})`;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angleDeg * Math.PI / 180);
+    const scale = (mainSize / 25) * 0.6;  // Adjust central grain scale based on baseGrainShape max radius
+    ctx.scale(scale, scale);
+    ctx.beginPath();
+    ctx.moveTo(mainGrainShape[0].x, mainGrainShape[0].y);
+    for (let j = 1; j < mainGrainShape.length; j++) {
+        ctx.lineTo(mainGrainShape[j].x, mainGrainShape[j].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1; // or 0.5 for very fine line
+    ctx.stroke();
+    ctx.restore();
+}
+
+
+
+
+
+
+function updateDisplay() {
+    drawColourBar();
+    drawRotSim();
+}
+
+angleSlider?.addEventListener('input', e => {
+    angleDeg = parseFloat(e.target.value);
+    updateDisplay();
+});
+
+thicknessSlider?.addEventListener('input', e => {
+    thickness = parseFloat(e.target.value);
+    if (thicknessDisplay) thicknessDisplay.textContent = thickness;
+    updateDisplay();
+});
+
+playButton?.addEventListener('click', () => {
+    autoRotate = !autoRotate;
+    playButton.textContent = autoRotate ? 'Pause' : 'Play';
+    if (autoRotate) requestAnimationFrame(stepRotate);
+});
+
+function stepRotate() {
+    if (!autoRotate) return;
+    angleDeg = (angleDeg + 1) % 360;
+    angleSlider.value = angleDeg;
+    updateDisplay();
+    requestAnimationFrame(stepRotate);
+}
+
+if (thicknessDisplay) thicknessDisplay.textContent = thickness;
+if (!isNaN(deltaN)) updateDisplay();

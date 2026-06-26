@@ -1,0 +1,484 @@
+document.addEventListener("DOMContentLoaded", function () {
+    const container = document.getElementById("radioactivity_simulator");
+    if (!container) return;
+
+    let U = parseFloat(container.dataset.u) || 0;
+    let Th = parseFloat(container.dataset.th) || 0;
+    let K = parseFloat(container.dataset.k) || 0;
+    let density = parseFloat(container.dataset.density) || 2.7;
+    let selectedMass = 1;
+    let selectedShield = "air";
+
+    const massOptions = [0.5, 1, 2, 5, 10, 20, 50, 100, 500, 1000];
+
+    const shieldingFactors = {
+        air:       { U: 1.0,  Th: 1.0,  K: 1.0 },
+        plastic:   { U: 0.85, Th: 0.8,  K: 0.9 },
+        aluminium: { U: 0.6,  Th: 0.5,  K: 0.7 },
+        lead:      { U: 0.01, Th: 0.01, K: 0.05 }
+    };
+    const svg = d3.select("#rad_diagram");
+    if (svg.empty()) return;
+
+    const width = +svg.attr("width");
+    const height = +svg.attr("height");
+    const center = { x: width / 2, y: height / 2 };
+    const rings = { "1cm": 25, "10cm": 55, "1m": 130 };
+
+    svg.selectAll("*").remove();
+    const root = svg.append("g").attr("transform", `translate(${center.x},${center.y})`);
+
+    const rock = root.append("path")
+        .attr("d", generateRockPath(8, 6))
+        .attr("fill", "#888");
+
+    const shieldRing = root.append("circle")
+        .attr("r", 20)
+        .attr("fill", "none");
+    const pulse = root.append("circle")
+        .attr("r", 0)
+        .attr("fill", "#ffcc00")
+        .attr("opacity", 0.4);
+
+    function animatePulse() {
+        pulse
+            .attr("r", 0)
+            .attr("opacity", 0.4)
+            .transition()
+            .duration(2000)
+            .ease(d3.easeCubicOut)
+            .attr("r", 140)
+            .attr("opacity", 0)
+            .on("end", animatePulse);
+    }
+
+    animatePulse();
+
+    const ringEls = {};
+    Object.entries(rings).forEach(([label, radius]) => {
+        ringEls[label] = root.append("circle")
+            .attr("r", radius)
+            .attr("fill", "none")
+            .attr("stroke", "#ccc")
+            .attr("stroke-width", 2)
+            .attr("opacity", 0.6);
+
+        root.append("text")
+            .attr("x", 0)
+            .attr("y", -radius - 4)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#666")
+            .attr("font-size", "10px")
+            .text(label);
+    });
+
+    const btnContainer = document.getElementById("rad_mass_buttons");
+    massOptions.forEach(val => {
+        const btn = document.createElement("button");
+        btn.textContent = val + "g";
+        btn.className = "rad_mass_btn btn btn-sm btn-outline-secondary";
+        btn.addEventListener("click", () => {
+            selectedMass = val;
+            document.querySelectorAll(".rad_mass_btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            update();
+        });
+        if (val === 1) btn.classList.add("active");
+        btnContainer.appendChild(btn);
+    });
+
+    document.querySelectorAll(".rad_shield_btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".rad_shield_btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            selectedShield = btn.dataset.shield;
+            update();
+
+        });
+    });
+
+    function computeActivity(U, Th, K, mass) {
+        // Convert % to fractions
+
+        const fracU = U / 100.0;
+        const fracTh = Th / 100.0;
+        const fracK = K / 100.0;
+
+        // Activity per kg
+        const activityPerKg = (fracU * 25000 + fracTh * 4000 + fracK * 31);
+
+       console.log("U:", U, "Th:", Th, "K:", K, "Mass:", selectedMass, "Activity per Kg:", activityPerKg);
+
+
+        return activityPerKg * mass ;  // ← FIXED
+    }
+
+
+
+    function computeDoseDetailed(U_percent, Th_percent, K_percent, mass_g, dist_cm, shielding) {
+        const U_Bq_per_g = 25000, Th_Bq_per_g = 4000, K_Bq_per_g = 31;
+        const gammaFactors = {
+            U: 0.0005,
+            Th: 0.0009,
+            K: 0.000792
+        };
+
+        const sf = shieldingFactors[shielding];
+
+        const fracU = U_percent / 100, fracTh = Th_percent / 100, fracK = K_percent / 100;
+        const total_U_Bq = fracU * mass_g * U_Bq_per_g;
+        const total_Th_Bq = fracTh * mass_g * Th_Bq_per_g;
+        const total_K_Bq = fracK * mass_g * K_Bq_per_g;
+
+        const distSq = dist_cm * dist_cm || 0.01;
+
+        const doseU = (total_U_Bq * gammaFactors.U / distSq) * sf.U;
+        const doseTh = (total_Th_Bq * gammaFactors.Th / distSq) * sf.Th;
+        const doseK = (total_K_Bq * gammaFactors.K / distSq) * sf.K;
+
+        return {
+            U: doseU,
+            Th: doseTh,
+            K: doseK,
+            total: doseU + doseTh + doseK
+        };
+    }
+
+
+    function computeUSPSRadius(U, Th, K, mass) {
+        const maxDose_uSv_hr = 5.0;
+        const shielding = selectedShield;
+
+        let radius_cm = 0.1;
+        while (radius_cm < 1000) {
+            const dose = computeDoseDetailed(U, Th, K, mass, radius_cm, shielding).total;
+            if (dose <= maxDose_uSv_hr) break;
+            radius_cm += 0.1;
+        }
+        return radius_cm;
+    }
+
+    function updateUSPS() {
+        const maxDose_uSv_hr = 5.0; // USPS limit = 0.5 mrem/hr
+        const radius_cm = computeUSPSRadius(U, Th, K, selectedMass);
+        const padded_cm = Math.ceil(radius_cm);
+        const boxDim = padded_cm * 2;
+
+        const target = document.getElementById("rad_usps_recommendation");
+        if (!target) return;
+
+
+        const shieldNote = selectedShield !== "air" ? ` (shielded in ${selectedShield})` : "";
+
+        let message = "";
+
+        if (padded_cm <= 1) {
+            target.className = "rad_usps_box rad_usps_notice";
+            message = `<div class="rad_alert_row"><div class="rad_alert_icon">✅</div><div class="rad_alert_text"><strong>USPS Mailing:</strong> For a ${selectedMass}g sample${shieldNote}, there are no special packaging recommendations.</div></div>`;
+        } else if (padded_cm > 30) {
+            target.className = "rad_usps_box rad_usps_warning";
+            message = `<div class="rad_alert_row"><div class="rad_alert_icon">❌</div><div class="rad_alert_text"><strong>USPS Mailing:</strong> For a ${selectedMass}g sample${shieldNote}, the required air gap exceeds 30 cm. It is not recommended to mail this specimen.</div></div>`;
+        } else {
+            target.className = "rad_usps_box rad_usps_warning";
+            message = `<div class="rad_alert_row"><div class="rad_alert_icon">⚠️</div><div class="rad_alert_text"><strong>USPS Mailing:</strong> For a ${selectedMass}g sample${shieldNote}, an air gap of ${padded_cm} cm is recommended to meet USPS radiation exposure limits. (Minimum external box dimensions: ${boxDim} × ${boxDim} × ${boxDim} cm)</div></div>`;
+        }
+
+        target.innerHTML = message;
+    }
+
+
+
+    function riskLevelFromDose(dose, dist_cm) {
+        const dailyLimit = 1000 / 365.25;
+        const annualLimit = 1000;
+
+        if (dist_cm === 1) {
+            const minutesPerDay = (dailyLimit / dose) * 60;
+            if (minutesPerDay < 0.1) return "danger";
+            if (minutesPerDay < 1) return "veryhigh";
+            if (minutesPerDay < 5) return "high";
+            if (minutesPerDay < 10) return "moderate";
+            return "low";
+        } else {
+            const daysToAnnual = annualLimit / (dose * 24);
+
+            if (daysToAnnual < 1) return "danger";
+            if (daysToAnnual < 7) return "veryhigh";
+            if (daysToAnnual < 28) return "high";
+            if (daysToAnnual < 90) return "moderate";
+            return "low";
+        }
+    }
+
+    function computeMinutesPerDay(doseRatePerHour) {
+        const dailyLimit = 1000 / 365.25;
+        return (dailyLimit / doseRatePerHour) * 60;
+    }
+
+    function computeDaysToAnnual(doseRatePerHour) {
+        const annualLimit = 1000;
+        return annualLimit / (doseRatePerHour * 24);
+    }
+
+    function update() {
+        const activity = computeActivity(U, Th, K, selectedMass);
+        document.getElementById("rad_activity_val").textContent = activity.toLocaleString(undefined, { maximumFractionDigits: 0 }) + " Bq";
+
+        const d1 = computeDoseDetailed(U, Th, K, selectedMass, 1, selectedShield);
+        const d10 = computeDoseDetailed(U, Th, K, selectedMass, 10, selectedShield);
+        const d100 = computeDoseDetailed(U, Th, K, selectedMass, 100, selectedShield);
+
+        document.getElementById("rad_dose_1cm").textContent = d1.total.toFixed(2) + " µSv/h";
+        document.getElementById("rad_risk_1cm").textContent = riskLabel(riskLevelFromDose(d1.total, 1));
+
+        document.getElementById("rad_dose_10cm").textContent = d10.total.toFixed(2) + " µSv/h";
+        document.getElementById("rad_risk_10cm").textContent = riskLabel(riskLevelFromDose(d10.total, 10));
+
+        document.getElementById("rad_dose_1m").textContent = d100.total.toFixed(2) + " µSv/h";
+        document.getElementById("rad_risk_1m").textContent = riskLabel(riskLevelFromDose(d100.total, 100));
+
+        const uspsRadius = computeUSPSRadius(U, Th, K, selectedMass);
+        const uspsElem = document.getElementById("rad_usps_result");
+
+        updateUSPS();
+        ringEls["1cm"].attr("stroke", colorFromDose(d1.total, 1));
+        ringEls["10cm"].attr("stroke", colorFromDose(d10.total, 10));
+        ringEls["1m"].attr("stroke", colorFromDose(d100.total, 100));
+
+        shieldRing
+            .attr("stroke", {
+                plastic: "#d8d8aa",
+                aluminium: "#aaa",
+                lead: "#444",
+                air: "none"
+            }[selectedShield])
+            .attr("stroke-width", {
+                plastic: 1,
+                aluminium: 2,
+                lead: 4,
+                air: 0
+            }[selectedShield])
+            .attr("opacity", selectedShield === "air" ? 0 : 1);
+
+        updateWarnings();
+    }
+
+    // Assume U, Th, K variables (representing elemental percentages)
+// and computeDose function are defined in the scope accessible to updateRiskSummary.
+// Assume shieldingFactors object and riskLabel function are also defined elsewhere.
+
+    function updateRiskSummary() {
+        // --- Dose Limits ---
+        // Standard general public annual effective dose limit from artificial sources: 1 mSv (1000 µSv).
+        // Deriving an average daily limit for comparison.
+        const dailyLimit = 1000 / 365.25; // µSv/day (approx 2.738 µSv/day)
+
+        const annualLimit = 1000; // µSv/year (1 mSv/year - standard annual limit for general public)
+
+        // --- Calculate Doses for Different Masses ---
+        // It's assumed that U, Th, K here are global or passed in from an outer scope
+        // and represent the elemental percentages of the sample being assessed.
+        const doses = [1, 10, 100].map(mass => { // Iterates for 1g, 10g, 100g samples
+            // d1cm: Dose rate at 1 cm from the sample (in µSv/h)
+            const d1cm = computeDoseDetailed(U, Th, K, mass, 1, "air");
+            // d1m: Dose rate at 1 m (100 cm) from the sample (in µSv/h)
+            const d1m = computeDoseDetailed(U, Th, K, mass, 100, "air");
+
+            // --- Risk Calculation for 1 cm (Handheld) ---
+            // Corrected: (Daily Limit in µSv/day) / (Dose rate in µSv/h) gives hours.
+            // Multiply by 60 to convert to minutes.
+            const minutesPerDay = computeMinutesPerDay(d1cm.total);
+            const daysToAnnual = computeDaysToAnnual(d1m.total);
+
+            // --- Risk Categorization (1 cm Handheld) ---
+            // Thresholds based on minutes to reach daily limit. Adjust these as per your desired risk scale.
+            const risk1cm = riskLevelFromDose(d1cm.total, 1);
+            const risk1m = riskLevelFromDose(d1m.total, 100);
+
+            return { mass, d1cm, minutesPerDay, risk1cm, d1m, daysToAnnual, risk1m };
+        });
+
+        // --- Generate HTML Table ---
+        let html = `<table class="mindattable rad_risk_table">
+      <tr><th rowspan=2>Mass</th><th colspan=3>1 cm (Handheld)</th><th colspan=3>1 m (Display)</th></tr>
+      <tr><th>µSv/h</th><th>Safe</th><th>Risk</th><th>µSv/h</th><th>Safe</th><th>Risk</th></tr>`;
+
+        doses.forEach(row => {
+            let safe1cm;
+            // Display 'safe' time for 1cm exposure.
+            // If it takes more than 24 hours (1440 minutes) to reach daily limit, classify as "no risk".
+            if (row.minutesPerDay > 1440) {
+                safe1cm = "low risk";
+            } else if (row.minutesPerDay > 120) { // If more than 2 hours (120 minutes)
+                safe1cm = (row.minutesPerDay / 60).toFixed(1) + " h/day"; // Display in hours (e.g., 2.5 h/day)
+            } else if(row.minutesPerDay >= 1) {
+                safe1cm = Math.floor(row.minutesPerDay) + " min/day"; // Display in minutes (e.g., 5 min/day)
+            } else
+            {
+                safe1cm = (row.minutesPerDay).toFixed(1) + " min/day"; // Display in minutes (e.g., 5 min/day)
+            }
+
+            let safe1m;
+            // Display 'safe' time for 1m exposure.
+            // If it takes more than 365 days (1 year) to reach annual limit, classify as "no risk".
+            if (row.daysToAnnual > 365) {
+                safe1m = "low risk";
+            } else {
+                safe1m = Math.floor(row.daysToAnnual) + " days/year"; // Display in days
+            }
+
+            html += `<tr>
+  <td class="tdright">${row.mass}g</td>
+  <td class="tdright">${row.d1cm.total.toFixed(2)}</td>
+  <td class="tdright">${safe1cm}</td>
+  <td>${riskLabel(row.risk1cm)}</td>
+  <td class="tdright">${row.d1m.total.toFixed(3)}</td>
+  <td class="tdright">${safe1m}</td>
+  <td>${riskLabel(row.risk1m)}</td>
+</tr>`;
+        });
+
+        html += `</table>`;
+        document.getElementById("rad_risk_level").innerHTML = html;
+    }
+
+
+
+    function riskLabel(level) {
+        return {
+            low: "🟢 Low",
+            moderate: "🟡 Moderate",
+            high: "🟠 High",
+            veryhigh: "🔴 Very High",
+            danger: "☢️ Extremely High"
+        }[level];
+    }
+
+    function estimateRadonBuildup(U_percent, Th_percent, mass_g, duration_sec = null) {
+        const emanationFraction = 0.1; // 10% radon escapes the grain
+        const uActivityPerGram = 12300; // Bq/g (U-238)
+        const thActivityPerGram = 4000; // Bq/g (Th-232)
+
+        // Decay constants (lambda = ln(2) / t1/2)
+        const ln2 = Math.log(2);
+        const t_half_Rn222 = 3.823 * 24 * 3600; // seconds (Rn-222 ~3.8 days)
+        const t_half_Rn220 = 55;               // seconds (Rn-220 = 55 sec)
+        const lambda_Rn222 = ln2 / t_half_Rn222;
+        const lambda_Rn220 = ln2 / t_half_Rn220;
+
+        // Production rate in Bq = atoms/sec
+        const radonFromU = (U_percent / 100) * mass_g * uActivityPerGram * emanationFraction;
+        const radonFromTh = (Th_percent / 100) * mass_g * thActivityPerGram * emanationFraction;
+
+        // Steady-state radon atom count = R / lambda
+        const steadyRn222Atoms = radonFromU / lambda_Rn222;
+        const steadyRn220Atoms = radonFromTh / lambda_Rn220;
+
+        // Optionally calculate non-equilibrium at a fixed time
+        let timeLimitedRn222 = null;
+        let timeLimitedRn220 = null;
+        if (duration_sec !== null) {
+            timeLimitedRn222 = radonFromU / lambda_Rn222 * (1 - Math.exp(-lambda_Rn222 * duration_sec));
+            timeLimitedRn220 = radonFromTh / lambda_Rn220 * (1 - Math.exp(-lambda_Rn220 * duration_sec));
+        }
+
+        return {
+            productionRate: {
+                Rn222: radonFromU,     // atoms/sec
+                Rn220: radonFromTh     // atoms/sec
+            },
+            steadyStateAtoms: {
+                Rn222: steadyRn222Atoms,
+                Rn220: steadyRn220Atoms
+            },
+            timeLimitedAtoms: duration_sec !== null ? {
+                Rn222: timeLimitedRn222,
+                Rn220: timeLimitedRn220
+            } : null
+        };
+    }
+
+    function radonRiskLabel(accumulatedAtoms) {
+        if (accumulatedAtoms < 1e8) return "🔵 Negligible";
+        if (accumulatedAtoms < 1e9) return "🟢 Low";
+        if (accumulatedAtoms < 1e10) return "🟡 Moderate";
+        if (accumulatedAtoms < 1e11) return "🟠 High";
+        return "🔴 Very High";
+    }
+
+    function updateWarnings() {
+        const warnings = [];
+        let vent="";
+        if (U > 1 || Th > 1) {
+            warnings.push("<div class=\"rad_alert_row\"><div class=\"rad_alert_icon\">⚠️</div><div class=\"rad_alert_text\"><strong>Alpha hazard:</strong> Avoid inhaling dust from this specimen.</div></div>");
+        }
+
+
+        const durationSec = 30 * 24 * 3600; // 1 month
+        const radon = estimateRadonBuildup(U, Th, selectedMass, durationSec);
+
+        const rn222_atoms = radon.timeLimitedAtoms?.Rn222 || 0;
+        const rn220_atoms = radon.timeLimitedAtoms?.Rn220 || 0;
+        const totalRadonAtoms = rn222_atoms + rn220_atoms;
+
+        if (totalRadonAtoms > 1e7) { // Ignore trivial cases
+            let vent;
+            if (totalRadonAtoms >= 1e11) {
+                vent = ' Store in a well-ventilated space.';
+            } else if (totalRadonAtoms >= 1e9) {
+                vent = ' Be aware of potential indoor accumulation.';
+            } else {
+                vent = ' Minimal ventilation needed.';
+            }
+
+            const label = radonRiskLabel(totalRadonAtoms);
+            warnings.push(`<div class=\"rad_alert_row\"><div class="rad_alert_icon">⚠️</div><div class="rad_alert_text"><strong>Radon risk:</strong> Estimated <b>${label}</b>${vent}</div></div>`);
+        }
+
+        const warnBox = document.getElementById("rad_warnings");
+        if (warnings.length) {
+            warnBox.innerHTML = `<div class=\"rad_alert_rows\"><div class="rad_warning_box">${warnings.map(w => `<p>${w}</p>`).join("")}</div></div>`;
+        } else {
+            warnBox.innerHTML = "";
+        }
+    }
+
+    function colorFromDose(dose, dist_cm) {
+        const dailyLimit = 1000 / 365.25; // ≈ 2.74 µSv/day
+        const annualLimit = 1000;         // 1000 µSv/year
+
+        if (dist_cm === 1) {
+            const minutesPerDay = (dailyLimit / dose) * 60;
+
+            if (minutesPerDay < 0.1) return "#6d0000";       // ☢️ DANGER (under 1 min)
+            if (minutesPerDay < 2) return "#c62828";          // 🔴 Very High (under 2 min)
+            if (minutesPerDay < 8) return "#fb8c00";          // 🟠 High (under 8 min)
+            if (minutesPerDay < 30) return "#fdd835";         // 🟡 Moderate (under 30 min)
+            return "#66bb6a";                                 // 🟢 Low
+        } else {
+            const daysToAnnual = annualLimit / (dose * 24);
+
+            if (daysToAnnual < 1) return "#6d0000";           // ☢️ DANGER (under 1 day)
+            if (daysToAnnual < 7) return "#c62828";           // 🔴 Very High (under 1 week)
+            if (daysToAnnual < 28) return "#fb8c00";          // 🟠 High (under 4 weeks)
+            if (daysToAnnual < 90) return "#fdd835";          // 🟡 Moderate (under 3 months)
+            return "#66bb6a";                                 // 🟢 Low
+        }
+    }
+
+    function generateRockPath(radius, irregularity) {
+        const points = 12;
+        let path = "";
+        for (let i = 0; i <= points; i++) {
+            const angle = (i / points) * 2 * Math.PI;
+            const r = radius + (Math.random() - 0.5) * irregularity;
+            const x = r * Math.cos(angle);
+            const y = r * Math.sin(angle);
+            path += (i === 0 ? "M" : "L") + x.toFixed(2) + "," + y.toFixed(2) + " ";
+        }
+        return path + "Z";
+    }
+
+    update();
+    updateRiskSummary();
+});
