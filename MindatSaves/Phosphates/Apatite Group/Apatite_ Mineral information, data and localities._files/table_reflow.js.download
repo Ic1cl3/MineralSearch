@@ -1,0 +1,152 @@
+// table_reflow.js
+// Automatically reflows wide tables with class 'table_reflow' into multiple columns
+
+(function () {
+    function debugContainerWidthTrace(container) {
+        let node = container;
+        console.log("=== Begin container width trace ===");
+        while (node && node.nodeType === Node.ELEMENT_NODE) {
+            const computed = window.getComputedStyle(node);
+            const styleWidth = node.style.width || '(none)';
+            const computedWidth = computed.getPropertyValue("width");
+            const rect = node.getBoundingClientRect();
+
+            const idStr = node.id ? `#${node.id}` : "";
+            const classStr = node.className ? `.${node.className.split(" ").join(".")}` : "";
+
+            console.log(
+                `<${node.tagName.toLowerCase()}${idStr}${classStr}>`,
+                `| style.width: ${styleWidth}`,
+                `| computed: ${computedWidth}`,
+                `| rect: ${rect.width.toFixed(2)}px`,
+                `| offsetWidth: ${node.offsetWidth}`
+            );
+
+            node = node.parentElement;
+        }
+        console.log("=== End container width trace ===");
+    }
+
+    function reflowTable(original) {
+        const wrapperId = original.id + "_wrapper";
+        let wrapper = document.getElementById(wrapperId);
+
+        if (!wrapper) {
+            wrapper = document.createElement("div");
+            wrapper.id = wrapperId;
+            wrapper.className = "table_reflow_wrapper";
+            original.parentNode.insertBefore(wrapper, original.nextSibling);
+        }
+
+        const rows = Array.from(original.querySelectorAll("tbody tr"));
+
+        if (rows.length < 8) {
+            original.style.display = "";
+            wrapper.innerHTML = "";
+            return;
+        }
+
+        const container = wrapper.parentNode;
+        debugContainerWidthTrace(container);
+        const containerWidth = container.getBoundingClientRect().width;
+        console.log("Reflowing:", original.id, "Container width:", containerWidth);
+
+        const approxColWidth = 220;
+        const colCount = Math.max(1, Math.floor(containerWidth / approxColWidth));
+        const perCol = Math.ceil(rows.length / colCount);
+
+        // Clear and prep wrapper
+        wrapper.innerHTML = "";
+        wrapper.style.display = "flex";
+        wrapper.style.flexWrap = "wrap";
+        wrapper.style.gap = "1em";
+        wrapper.style.width = "max-content";
+        wrapper.style.alignItems = "flex-start";
+
+        const thead = original.querySelector("thead");
+        const thCount = thead ? thead.querySelectorAll("th").length : 0;
+        const firstRowCols = rows[0].querySelectorAll("td").length;
+
+        if (firstRowCols > 4) {
+            const headers = Array.from(thead ? thead.querySelectorAll("th") : []);
+            const rowData = rows.map(row => Array.from(row.querySelectorAll("td")).map(td => td.innerHTML));
+
+            const perTable = Math.ceil(headers.length / colCount);
+            const subTablesToRender = Math.ceil(headers.length / perTable);
+
+            for (let i = 0; i < subTablesToRender; i++) {
+                const subTable = document.createElement("table");
+                subTable.className = original.className.replace("table_reflow", "table_reflowed");
+                subTable.style.cssText += "margin:0; flex: 0 0 auto";
+                if (original.getAttribute("data-style")) {
+                    subTable.setAttribute("style", original.getAttribute("data-style") + "; margin:0; flex: 0 0 auto");
+                }
+
+                const subThead = document.createElement("thead");
+                const headRow = document.createElement("tr");
+
+                for (let j = i * perTable; j < (i + 1) * perTable && j < headers.length; j++) {
+                    const th = document.createElement("th");
+                    th.innerHTML = headers[j].innerHTML;
+                    headRow.appendChild(th);
+                }
+                subThead.appendChild(headRow);
+
+                const subTbody = document.createElement("tbody");
+                rowData.forEach(row => {
+                    const tr = document.createElement("tr");
+                    for (let j = i * perTable; j < (i + 1) * perTable && j < row.length; j++) {
+                        const td = document.createElement("td");
+                        td.innerHTML = row[j] || "";
+                        tr.appendChild(td);
+                    }
+                    subTbody.appendChild(tr);
+                });
+
+                subTable.appendChild(subThead);
+                subTable.appendChild(subTbody);
+                wrapper.appendChild(subTable);
+            }
+        } else {
+            for (let i = 0; i < colCount; i++) {
+                const table = document.createElement("table");
+                table.className = original.className.replace("table_reflow", "table_reflowed");
+                table.style.cssText += "margin:0; flex: 0 0 auto";
+                if (original.getAttribute("data-style")) {
+                    table.setAttribute("style", original.getAttribute("data-style") + "; margin:0; flex: 0 0 auto");
+                }
+
+                const newThead = thead ? thead.cloneNode(true) : null;
+                const tbody = document.createElement("tbody");
+
+                rows.slice(i * perCol, (i + 1) * perCol).forEach(row => {
+                    tbody.appendChild(row.cloneNode(true));
+                });
+
+                if (newThead) table.appendChild(newThead);
+                table.appendChild(tbody);
+                wrapper.appendChild(table);
+            }
+        }
+
+        original.style.display = "none";
+    }
+
+    function reflowAllTables() {
+        const tables = document.querySelectorAll("table.table_reflow");
+        tables.forEach(table => {
+            if (!table.id) table.id = "table_reflow_" + Math.random().toString(36).substr(2, 9);
+            reflowTable(table);
+        });
+    }
+
+    window.addEventListener("load", reflowAllTables);
+    window.addEventListener("resize", () => {
+        document.querySelectorAll(".table_reflow").forEach(table => {
+            const wrapper = document.getElementById(table.id + "_wrapper");
+            if (wrapper) wrapper.innerHTML = "";
+            table.style.display = "";
+        });
+        reflowAllTables();
+    });
+})();
