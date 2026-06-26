@@ -1,0 +1,247 @@
+// reflectance_graph.js
+// Render a beautiful interactive D3.js graph of reflectance data with R1/R2 lines and tooltips
+
+(function () {
+    const margin = { top: 5, right: 5, bottom: 30, left: 30 };
+    const spectrumStart = 390;
+    const spectrumEnd = 780;
+
+    function renderReflectanceGraph(containerId, data) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+
+        let width = container.clientWidth;
+        const height = 160;
+
+        const svg = d3.select(container)
+            .append("svg")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet")
+            .style("width", "100%")
+            .style("height", `${height}px`);
+
+        const controls = d3.select(container)
+            .append("div")
+            .style("margin-top", "1px")
+            .style("margin-left", `${margin.left}px`)
+            .style("display", "flex")
+            .style("gap", "10px")
+            .style("justify-content", "flex-start")
+            .style("align-items", "center")
+            .style("font-size", "16px")
+            .style("flex-wrap", "wrap");
+
+        let currentXDomain = [390, 780];
+        let currentYDomain = [0, 100];
+        let originalXDomain = [...currentXDomain];
+        let originalYDomain = [...currentYDomain];
+
+        let showR1 = true;
+        let showR2 = true;
+        let autoFit = false;
+        const hasR2 = data.some(d => d.R2 != null && !isNaN(d.R2));
+
+
+        const render = () => {
+            width = container.clientWidth;
+            svg.attr("viewBox", `0 0 ${width} ${height}`);
+            svg.selectAll("*").remove();
+
+            const innerWidth = width - margin.left - margin.right;
+            const innerHeight = height - margin.top - margin.bottom - 14;
+
+            const x = d3.scaleLinear()
+                .domain(currentXDomain)
+                .range([0, innerWidth]);
+
+            const y = d3.scaleLinear().domain(currentYDomain).nice().range([innerHeight, 0]);
+
+            const g = svg.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            g.append("g")
+                .attr("transform", `translate(0,${innerHeight})`)
+                .call(d3.axisBottom(x).tickValues(d3.range(400, 781, 50)).tickFormat(d => d + " nm"))
+                .call(g => g.selectAll("text").style("font-size", "10px").attr("dy", "1em"));
+
+            g.append("g")
+                .call(d3.axisLeft(y).ticks(5))
+                .call(g => g.selectAll("text").style("font-size", "10px"));
+
+            const lineR1 = d3.line()
+                .defined(d => showR1 && d.R1 != null && !isNaN(d.R1))
+                .x(d => x(d.wavelength))
+                .y(d => y(d.R1));
+
+            const lineR2 = d3.line()
+                .defined(d => showR2 && d.R2 != null && !isNaN(d.R2))
+                .x(d => x(d.wavelength))
+                .y(d => y(d.R2));
+
+            g.selectAll(".vlines")
+                .data(data)
+                .join("line")
+                .transition()
+                .duration(300)
+                .attr("x1", d => x(d.wavelength))
+                .attr("x2", d => x(d.wavelength))
+                .attr("y1", d => {
+                    const values = [];
+                    if (showR1 && d.R1 != null && !isNaN(d.R1)) values.push(d.R1);
+                    if (showR2 && d.R2 != null && !isNaN(d.R2)) values.push(d.R2);
+                    return y(values.length > 0 ? Math.max(...values) : 0);
+                })
+                .attr("y2", innerHeight)
+                .attr("stroke", "#aaa")
+                .attr("stroke-width", 0.3);
+
+            if (showR1) {
+                g.append("path")
+                    .datum(data)
+                    .attr("fill", "none")
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 0.5)
+                    .attr("d", lineR1);
+            }
+
+            if (showR2) {
+                g.append("path")
+                    .datum(data)
+                    .attr("fill", "none")
+                    .attr("stroke", "red")
+                    .attr("stroke-width", 0.5)
+                    .attr("d", lineR2);
+            }
+
+            const tooltip = g.append("g").style("display", "none");
+            tooltip.append("circle").attr("r", 2.5).attr("fill", "orange");
+            const tooltipText = tooltip.append("text")
+                .attr("x", 5)
+                .attr("y", -5)
+                .attr("font-size", "12px")
+                .attr("fill", "black");
+
+            svg.on("mousemove", function (event) {
+                const [mx] = d3.pointer(event);
+                const graphX = x.invert(mx - margin.left);
+                const nearest = data.reduce((a, b) => Math.abs(b.wavelength - graphX) < Math.abs(a.wavelength - graphX) ? b : a);
+                const r1 = showR1 && nearest.R1 != null ? nearest.R1.toFixed(1) : "-";
+                const r2 = showR2 && nearest.R2 != null ? nearest.R2.toFixed(1) : "-";
+                const value = showR1 ? nearest.R1 : nearest.R2;
+                tooltip.attr("transform", `translate(${x(nearest.wavelength)},${y(value || 0)})`);
+                tooltipText.text(`${nearest.wavelength}nm: ${r1} / ${r2}`);
+                tooltip.style("display", null);
+            });
+
+            svg.on("mouseleave", () => tooltip.style("display", "none"));
+
+            const spectrumHeight = 6;
+            const spectrumY = innerHeight;
+            const spectrum = g.append("g")
+                .attr("transform", `translate(0, ${spectrumY})`);
+
+            const grad = svg.append("defs")
+                .append("linearGradient")
+                .attr("id", "spectrumGradient")
+                .attr("x1", "0%")
+                .attr("x2", "100%")
+                .attr("y1", "0%")
+                .attr("y2", "0%");
+
+            grad.selectAll("stop").remove();
+            const nmToRGB = (nm) => {
+                let r = 0, g = 0, b = 0;
+                if (nm >= 380 && nm < 440) { r = -(nm - 440) / (440 - 380); b = 1; }
+                else if (nm >= 440 && nm < 490) { g = (nm - 440) / (490 - 440); b = 1; }
+                else if (nm >= 490 && nm < 510) { g = 1; b = -(nm - 510) / (510 - 490); }
+                else if (nm >= 510 && nm < 580) { r = (nm - 510) / (580 - 510); g = 1; }
+                else if (nm >= 580 && nm < 645) { r = 1; g = -(nm - 645) / (645 - 580); }
+                else if (nm >= 645 && nm <= 780) { r = 1; }
+                const intensity = (nm >= 380 && nm <= 420) ? 0.3 + 0.7 * (nm - 380) / (420 - 380)
+                    : (nm > 700 && nm <= 780) ? 0.3 + 0.7 * (780 - nm) / (780 - 700)
+                        : 1;
+                r = Math.round(r * intensity * 255);
+                g = Math.round(g * intensity * 255);
+                b = Math.round(b * intensity * 255);
+                return `rgb(${r},${g},${b})`;
+            };
+
+            const gradientSteps = 60;
+            for (let i = 0; i <= gradientSteps; i++) {
+                const ratio = i / gradientSteps;
+                const nm = currentXDomain[0] + (currentXDomain[1] - currentXDomain[0]) * ratio;
+                grad.append("stop")
+                    .attr("offset", `${(ratio * 100).toFixed(2)}%`)
+                    .attr("stop-color", nmToRGB(nm));
+            }
+
+            spectrum.append("rect")
+                .attr("x", 0)
+                .attr("y", 0)
+                .attr("width", innerWidth)
+                .attr("height", spectrumHeight)
+                .style("fill", "url(#spectrumGradient)")
+                .style("stroke", "#333")
+                .style("stroke-width", 0.2);
+        };
+
+        const autoFitButton = controls.append("button")
+            .text("Auto-fit axes")
+            .style("padding", "2px 5px")
+            .on("click", () => {
+                if (!autoFit) {
+                    const visibleData = data.filter(d => d.wavelength >= currentXDomain[0] && d.wavelength <= currentXDomain[1]);
+                    const allY = visibleData.flatMap(d => [d.R1, d.R2].filter(v => v != null && !isNaN(v)));
+                    currentYDomain = d3.extent(allY);
+                    currentXDomain = d3.extent(visibleData, d => d.wavelength);
+                    autoFit = true;
+                    autoFitButton.text("Reset");
+                } else {
+                    currentXDomain = [...originalXDomain];
+                    currentYDomain = [...originalYDomain];
+                    autoFit = false;
+                    autoFitButton.text("Auto-fit axes");
+                }
+                render();
+            });
+
+        if (hasR2) {
+            const checkR1 = controls.append("label").text(" R1")
+                .insert("input", ":first-child")
+                .attr("type", "checkbox")
+                .property("checked", showR1)
+                .on("change", function () {
+                    if (!this.checked && !showR2) {
+                        this.checked = true;
+                        return;
+                    }
+                    showR1 = this.checked;
+                    render();
+                });
+
+            const checkR2 = controls.append("label").text(" R2")
+                .insert("input", ":first-child")
+                .attr("type", "checkbox")
+                .property("checked", showR2)
+                .on("change", function () {
+                    if (!this.checked && !showR1) {
+                        this.checked = true;
+                        return;
+                    }
+                    showR2 = this.checked;
+                    render();
+                });
+        } else {
+            // Only R1 available, make sure R2 is hidden
+            showR2 = false;
+        }
+
+        new ResizeObserver(() => {
+            render();
+        }).observe(container);
+
+        render();
+    }
+
+    window.renderReflectanceGraph = renderReflectanceGraph;
+})();
