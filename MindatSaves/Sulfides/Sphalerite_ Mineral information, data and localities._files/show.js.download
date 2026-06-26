@@ -1,0 +1,158 @@
+/* Javascript code copyright J.Ralph 2006
+*/
+
+
+function redrawxrd()
+{
+	var id=document.forms['xrdform'].xrdfile.value;
+	/*
+	var xstart=document.forms['xrdform'].xstart.value;
+	var xend=document.forms['xrdform'].xend.value;
+	var div=document.forms['xrdform'].div.value;
+	var od=document.forms['xrdform'].odata.checked;
+	var fd=document.forms['xrdform'].fdata.checked;
+*/
+	//if(xstart<5)
+	xstart=5;
+	//if(xend>90)
+	xend=90;
+	
+	od=1;
+	fd=0;
+	
+	
+	
+	//if(div<1) div=1;
+	//if(div>100)
+	
+	div=100;
+	
+	var img = document.getElementById('xrd');
+	
+	if((xend+0)>(xstart+0))
+	{	
+		msgshow('waitxrd');
+		img.src="rruffgraph.php?id="+id+"&type=xrd&xmin="+xstart+"&xmax="+xend+"&div="+div+"&od="+od+"&fd="+fd;
+	}
+}
+function redrawram()
+{
+	var id=document.forms['ramform'].ramfile.value;
+	var xstart=document.forms['ramform'].rxstart.value;
+	var xend=document.forms['ramform'].rxend.value;
+	var div=document.forms['ramform'].rdiv.value;
+	var od=document.forms['ramform'].rodata.checked;
+	var fd=document.forms['ramform'].rfdata.checked;
+
+	
+	
+	if(xstart<80) xstart=80;
+	if(xend>1600) xend=1600;
+	
+	if(div<1) div=1;
+	if(div>100) div=100;
+	
+	var img = document.getElementById('raman');
+	
+	msgshow('waitraman');
+	
+	img.src="rruffgraph.php?id="+id+"&type=raman&xmin="+xstart+"&xmax="+xend+"&div="+div+"&od="+od+"&fd="+fd;
+}
+
+function msghide(id)
+{
+	document.getElementById(id).style.visibility = 'hidden';
+}
+
+function msgshow(id)
+{
+	document.getElementById(id).style.visibility = 'visible';
+}
+
+function swapcrystal(sfile,stype,snotes)
+{
+	
+	var ele;
+	
+	//ele = document.getElementByName('xtlholder');
+	
+
+	eleN = document.getElementById("xtlinfo");
+	//snotes = decode64(snotes);
+	
+
+	if(stype=="smorf")
+	{
+		var smorfid;
+
+		ele = document.getElementById("xtlboximage");
+		ele.style.display="none";
+		
+		ele = document.getElementById("xtlbox3d");
+		ele.style.visibility="visible";
+
+
+		
+		
+		smorf.loadFile(sfile+".smorf.bin");	
+		
+			
+	} else
+	{
+
+			msgshow('waitxtl');
+			nimg = document.getElementById("xtlboximagefile");
+				
+			setTimeout("nimg.src=\"/xtls/"+sfile+"\";",100);
+	
+			ele = document.getElementById("xtlbox3d");
+			ele.style.visibility="hidden";
+
+			ele = document.getElementById("xtlboximage");
+			ele.style.display="block";
+		
+	}
+	
+	
+	eleN.innerHTML=snotes;
+
+	
+}
+
+function oncacheload()
+{
+}
+
+// Base64 code from Tyler Akins -- http://rumkin.com
+var keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+function decode64(input) 
+{
+   var output = "";
+   var chr1, chr2, chr3;
+   var enc1, enc2, enc3, enc4;
+   var i = 0;
+
+   input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
+
+   do {
+      enc1 = keyStr.indexOf(input.charAt(i++));
+      enc2 = keyStr.indexOf(input.charAt(i++));
+      enc3 = keyStr.indexOf(input.charAt(i++));
+      enc4 = keyStr.indexOf(input.charAt(i++));
+
+      chr1 = (enc1 << 2) | (enc2 >> 4);
+      chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+      chr3 = ((enc3 & 3) << 6) | enc4;
+
+      output = output + String.fromCharCode(chr1);
+
+      if (enc3 != 64) {
+         output = output + String.fromCharCode(chr2);
+      }
+      if (enc4 != 64) {
+         output = output + String.fromCharCode(chr3);
+      }
+   } while (i < input.length);
+
+   return output;
+}

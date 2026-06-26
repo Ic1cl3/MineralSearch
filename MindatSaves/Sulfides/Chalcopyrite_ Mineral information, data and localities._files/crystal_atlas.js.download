@@ -1,0 +1,158 @@
+"use strict";
+
+(function(window, document) {
+	function hideWait(waitId) {
+		if(!waitId) return;
+		if(typeof window.msghide === "function") {
+			window.msghide(waitId);
+			return;
+		}
+		var el = document.getElementById(waitId);
+		if(!el) return;
+		el.style.visibility = "hidden";
+		el.style.display = "none";
+	}
+
+	function findControlNode(startNode, rootNode) {
+		var node = startNode;
+		while(node && node !== rootNode) {
+			if(node.classList && node.classList.contains("xtl-smorf-control")) return node;
+			node = node.parentNode;
+		}
+		return null;
+	}
+
+	function runSmorfAction(node) {
+		if(typeof window.smorf === "undefined" || !window.smorf) return;
+
+		var action = node.getAttribute("data-smorf-action") || "";
+		var value = node.getAttribute("data-smorf-value");
+
+		switch(action) {
+			case "toggleLines":
+				window.smorf.toggleLines();
+				break;
+			case "toggleMillers":
+				window.smorf.toggleMillers();
+				break;
+			case "toggleAxes":
+				window.smorf.toggleAxes();
+				break;
+			case "setTransparency":
+				window.smorf.setTransparency(parseFloat(value));
+				break;
+			case "viewAlongAxis":
+				window.smorf.viewAlongAxis(value || "a");
+				break;
+			case "autoRotate":
+				window.smorf.autoRotate(-2, 100);
+				break;
+			case "stopAutoRotate":
+				window.smorf.stopAutoRotate();
+				break;
+		}
+	}
+
+	function setSmorfControlsVisibility(controlsEl, kind) {
+		if(!controlsEl) return;
+		controlsEl.style.display = (kind === "smorf") ? "" : "none";
+	}
+
+	function bindList(list, controlsEl) {
+		if(!list || list.dataset.xtlBound === "1") return;
+		list.addEventListener("click", function(ev) {
+			var node = ev.target;
+			while(node && node !== list && !(node.classList && node.classList.contains("xtl-trigger"))) node = node.parentNode;
+			if(!node || node === list) return;
+			ev.preventDefault();
+			var kind = node.getAttribute("data-crystal-kind") || "";
+			setSmorfControlsVisibility(controlsEl, kind);
+			if(typeof window.swapcrystal !== "function") return;
+			window.swapcrystal(
+				node.getAttribute("data-crystal-src") || "",
+				kind,
+				node.getAttribute("data-crystal-desc") || ""
+			);
+		});
+		list.dataset.xtlBound = "1";
+	}
+
+	function bindAbout(about) {
+		if(!about || about.dataset.xtlBound === "1") return;
+
+		about.addEventListener("click", function(ev) {
+			var node = findControlNode(ev.target, about);
+			if(!node) return;
+			ev.preventDefault();
+			runSmorfAction(node);
+		});
+
+		about.addEventListener("keydown", function(ev) {
+			if(ev.keyCode !== 13 && ev.keyCode !== 32 && ev.key !== "Enter" && ev.key !== " ") return;
+			var node = findControlNode(ev.target, about);
+			if(!node) return;
+			ev.preventDefault();
+			runSmorfAction(node);
+		});
+
+		about.dataset.xtlBound = "1";
+	}
+
+	function bindImageLoad(imageEl, waitId) {
+		if(!imageEl || imageEl.dataset.xtlBound === "1") return;
+		imageEl.addEventListener("load", function() {
+			hideWait(waitId);
+		});
+		imageEl.dataset.xtlBound = "1";
+	}
+
+	function initSmorf(smorfConfig) {
+		if(!smorfConfig) return;
+		if(typeof window.Smorf !== "function") return;
+
+		var canvas = document.getElementById(smorfConfig.canvasId || "cv");
+		if(!canvas || canvas.dataset.xtlSmorfInited === "1") return;
+
+		var viewer = new window.Smorf(canvas);
+		window.smorf = viewer;
+
+		viewer.setParameter("backgroundcolor", smorfConfig.backgroundcolor || "#ffffff");
+		viewer.setParameter("axes", !!smorfConfig.axes);
+		if(typeof smorfConfig.rotation !== "undefined" && smorfConfig.rotation !== null) {
+			viewer.setParameter("rotation", String(smorfConfig.rotation));
+		}
+		if(smorfConfig.filename) {
+			viewer.setParameter("filename", smorfConfig.filename);
+		}
+		if(smorfConfig.files_directory) {
+			viewer.setParameter("files_directory", smorfConfig.files_directory);
+		}
+		if(smorfConfig.definition) {
+			viewer.setParameter("definition", smorfConfig.definition);
+		}
+		viewer.init();
+		canvas.dataset.xtlSmorfInited = "1";
+	}
+
+	window.initCrystalAtlas = function(config) {
+		config = config || {};
+
+		var list = document.getElementById(config.listId || "xtlscrolllist");
+		var about = document.getElementById(config.aboutId || "xtlabout");
+		var controls = document.getElementById(config.smorfControlsId || "xtlsmorfcontrols");
+		var image = document.getElementById(config.imageId || "xtlboximagefile");
+		var waitId = config.waitId || "waitxtl";
+		var initial = config.initial || null;
+		var smorfConfig = config.smorf || null;
+
+		bindImageLoad(image, waitId);
+		bindList(list, controls);
+		bindAbout(about);
+		initSmorf(smorfConfig);
+		setSmorfControlsVisibility(controls, initial && initial.kind ? initial.kind : "");
+
+		if(initial && typeof window.swapcrystal === "function") {
+			window.swapcrystal(initial.src || "", initial.kind || "", initial.desc || "");
+		}
+	};
+})(window, document);
