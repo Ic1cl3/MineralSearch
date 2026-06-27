@@ -4,7 +4,7 @@ Also credited: jim_ox for scraping mindat for me
 
 ---
 
-[Use Now](https://ic1cl3.github.io/MineralSearch/)
+[Use Now](https://ic1cl3.github.io/MineralBrowse/)
 
 This is an almost useless static site I threw together for browsing the Mindat and wikipedia pages of Scioly minerals. I will add a rocks version if anyone actually uses this, but I probably won't. Contact me on discord if you want a rocks version. I made this because I was too lazy to make a sidebar chrome extension.
 
